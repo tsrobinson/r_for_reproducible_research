@@ -4,7 +4,7 @@
 ##      PROJECT AUTHOR:   THOMAS S. ROBINSON                        ##
 ##      EMAIL:            THOMAS.ROBINSON@POLITICS.OX.AC.UK         ##
 ##                                                                  ##
-##      DESCRIPTION:      Demo code using GoT dataset               ##
+##      DESCRIPTION:      Demo code using GoT dataset  (final)      ##
 ##                                                                  ##
 ######################################################################
 
