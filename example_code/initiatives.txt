@@ -1,0 +1,261 @@
+#########Analysis############
+library(ggplot2)
+library(directlabels)
+library(margins)
+library(reshape2)
+library(scales)
+library(openxlsx)
+library(ggpubr)
+
+#Unidimensional plot
+for (a in statecycle) {
+df <- leg.cand[leg.cand$election == a, ]
+name <- paste(a,".png",sep='')
+ggplot(df, aes(recipient_cfscore, df$seat)) +
+  geom_point(aes(color = party)) +
+  scale_color_manual(values = c("#429bf4","#f4414a","#686868")) +
+  theme_minimal() +
+  ggsave(name, device = 'png',path = "/Users/Tom/OneDrive/MPhil/Thesis/Data/Bonica/Plots/")
+}
+
+statecycle <- unique(all.contribs$StateCycle)
+
+#################################################################
+##################    INTER-CYCLE ANALYSIS     ##################
+#################################################################
+
+##### A - DISTRIBUTION PLOTS #####
+#Non-cumulative distributions plots of measures and legislature
+for (i in statecycle) {
+  
+  p <- ggplot(data=all.contribs[all.contribs$StateCycle == i,], aes(x= contributor_cfscore, fill = id_label, linetype= type)) +
+    geom_density(alpha=0.25) +
+    labs(x = 'Ideological Position', y="Frequency")
+  
+  #Add plot labels, name, and save
+  p <- direct.label(p, "top.bumptwice")
+  name <- paste(i,"_","density.png",sep='')
+  ggsave(name, device = 'png', plot = p, scale = 1.5, height = 4, width = 7, path = paste(dir,"/Plots/",sep=''))
+  rm(name)
+}
+##### Polarisation of legislatures #####
+state.means <- data.frame(state = character(),
+                          cycle = character(),
+                          chamber = character(),
+                          party = character(),
+                          mean = double(),
+                          stringsAsFactors = FALSE)
+
+# Creates dataframe with mean legislative ideological contributions per party and chamber
+for (i in c('2000','2002','2004','2006','2008','2010','2012')) {
+  for (j in c('AZ','CA','OR','WA', 'MA')) {
+    for (k in c('state:upper','state:lower')) {
+      for (l in c('100','200')) {
+        mn <- mean(all.contribs$contributor_cfscore[all.contribs$cycle == i & all.contribs$recipient_state == j & all.contribs$type == 'Legislature' & all.contribs$seat == k & all.contribs$recipient_party == l],na.rm = TRUE)
+        row <- c(j,i,k,l, mn)
+        state.means[nrow(state.means)+1,] <- row
+      }
+    }
+  }
+}
+
+state.means$cycle <- as.integer(state.means$cycle)
+state.means$mean <- as.double(state.means$mean)
+state.means$abs <- abs(state.means$mean)
+
+##Transform dataframe for results
+state.means.pub <- dcast(state.means, state + cycle ~ party + chamber, value.var = "mean")
+state.means.pub$cycle <- as.integer(state.means.pub$cycle)+2000
+
+#Simple scatterplot over time
+ggplot(state.means,
+       aes(x=cycle, y = mean, shape = chamber, color = party)) +
+  labs(title = "Mean Ideological Donation Score over Time", subtitle = "By state, year, party and chamber") +
+  geom_point() +
+  geom_smooth(method=lm) +
+  facet_wrap(~state) +
+  scale_color_manual(values=c("blue","red")) +
+  scale_x_continuous(breaks=seq(2000,2012,2), labels=c("2000","2002","2004","2006","2008","2010","2012"))
+
+##### Generates NCDF for legislative chambers, by party #####
+for (i in statecycle) {  
+  p1 <- ggplot(data=all.contribs[all.contribs$StateCycle == i & all.contribs$type == 'Legislature' & (all.contribs$recipient_party == 100 | all.contribs$recipient_party == 200),], 
+               aes(x= contributor_cfscore, fill = recipient_party, linetype = id_label)) +
+    geom_density(alpha=0.25) +
+    scale_fill_manual(name = "Party", values=c("blue", "red")) +
+    scale_linetype_manual(name = "Chamber", values = c(1,2), labels = c("Democrat","Republican")) +
+    labs(x = 'Ideological Position', y="Frequency") +
+    xlim(-2,2)
+  name <- paste(i,"_","leg_parties.png",sep='')
+  ggsave(name, device = 'png', plot = p1, scale = 1.5, height = 4, width = 7, path = paste(dir,"/Plots/Legislature/",sep=''))
+  rm(name)
+}
+rm(p1)
+
+
+## 2012 LEGISALTURE PANEL ##
+p1 <- ggplot(data=all.contribs[all.contribs$StateCycle == 'AZ2012' & all.contribs$type == 'Legislature' & (all.contribs$recipient_party == 100 | all.contribs$recipient_party == 200),], 
+             aes(x= contributor_cfscore, fill = recipient_party, linetype = id_label)) +
+  geom_density(alpha=0.25) +
+  ggtitle("AZ 2012") +
+  scale_fill_manual(name = "Party", values=c("blue", "red")) +
+  scale_linetype_manual(name = "Chamber", values = c(1,2), labels = c("Democrat","Republican")) +
+  labs(x = 'Ideological Position', y="Frequency") +
+  xlim(-2,2)
+
+p2 <- ggplot(data=all.contribs[all.contribs$StateCycle == 'CA2012' & !is.na(all.contribs$contributor_cfscore) & all.contribs$type == 'Legislature' & (all.contribs$recipient_party == 100 | all.contribs$recipient_party == 200),], 
+             aes(x= contributor_cfscore, fill = recipient_party, linetype = id_label)) +
+  geom_density(alpha=0.25) +
+  ggtitle("CA 2012") +
+  scale_fill_manual(name = "Party", values=c("blue", "red")) +
+  scale_linetype_manual(name = "Chamber", values = c(1,2), labels = c("Democrat","Republican")) +
+  labs(x = 'Ideological Position', y="Frequency") +
+  xlim(-2,2)
+
+p3 <- ggplot(data=all.contribs[all.contribs$StateCycle == 'OR2012' & all.contribs$type == 'Legislature' & (all.contribs$recipient_party == 100 | all.contribs$recipient_party == 200),], 
+             aes(x= contributor_cfscore, fill = recipient_party, linetype = id_label)) +
+  geom_density(alpha=0.25) +
+  ggtitle("OR 2012") +
+  scale_fill_manual(name = "Party", values=c("blue", "red")) +
+  scale_linetype_manual(name = "Chamber", values = c(1,2), labels = c("Democrat","Republican")) +
+  labs(x = 'Ideological Position', y="Frequency") +
+  xlim(-2,2)
+
+p4 <- ggplot(data=all.contribs[all.contribs$StateCycle == 'WA2012' & all.contribs$type == 'Legislature' & (all.contribs$recipient_party == 100 | all.contribs$recipient_party == 200),], 
+             aes(x= contributor_cfscore, fill = recipient_party, linetype = id_label)) +
+  geom_density(alpha=0.25) +
+  ggtitle("WA 2012") +
+  scale_fill_manual(name = "Party", values=c("blue", "red")) +
+  scale_linetype_manual(name = "Chamber", values = c(1,2), labels = c("Democrat","Republican")) +
+  labs(x = 'Ideological Position', y="Frequency") +
+  xlim(-2,2)
+
+p <- multiplot(p1,p2,p3,p4,cols=2)
+rm(name,p,p1,p2,p3,p4)
+
+
+##################### STATISTICAL TESTS ########################
+
+##### Set up dataframes #####
+basic.stats <- data.frame(Cycle = character(),
+                          lowchamn = integer(),
+                          uchamn = integer(),
+                          lowcham.mean = double(),
+                          ucham.mean = double(),
+                          dem.mean = double(),
+                          rep.mean = double(),
+                          dem.n = integer(),
+                          rep.n = integer(),
+                          dem.leg.n = integer(),
+                          rep.leg.n = integer(),
+                          leg.mannwhitney = double(),
+                          stringsAsFactors = FALSE)
+
+##Measure dataframe
+measure.stats <- data.frame(cycle = character(),
+                            measure = character(),
+                            n = integer(),
+                            measure.mean = numeric(),
+                            measure.sd = numeric(),
+                            `Dem Mean` = numeric(),
+                            `Dem SD` = numeric(),
+                            `Dem N` = integer(),
+                            `Rep Mean` = numeric(),
+                            `Rep SD` = numeric(),
+                            `Rep N` = integer(),
+                            lmean = numeric(),
+                            stringsAsFactors = FALSE)
+
+mann.whitney <- data.frame(cycle = character(),
+                           measure = character(),
+                           n = integer(),
+                           dem = numeric(),
+                           rep = numeric(),
+                           dem.p = numeric(),
+                           rep.p = numeric(),
+                           stringsAsFactors = F)
+
+### Populate tables
+for (i in statecycle) {
+  
+  ###Basic descriptive stats
+  df <- all.contribs[all.contribs$StateCycle == i, ]
+  ll.n <- sum(df$seat == 'state:lower')
+  lu.n <- sum(df$seat == 'state:upper')
+  leg.mannwhitney <- wilcox.test(df$contributor_cfscore[df$seat == 'state:lower'],df$contributor_cfscore[df$seat == 'state:upper'])
+  
+  ll.mean <- mean(df$contributor_cfscore[df$seat == 'state:lower'],na.rm=TRUE)
+  lu.mean <- mean(df$contributor_cfscore[df$seat == 'state:upper'],na.rm=TRUE)
+  l.mean <- mean(df$contributor_cfscore[df$type == 'Legislature'],na.rm=TRUE)
+  dem.mean <- mean(df$contributor_cfscore[df$type == 'Legislature' & df$recipient_party == 100],na.rm=TRUE)
+  rep.mean <- mean(df$contributor_cfscore[df$type == 'Legislature' & df$recipient_party == 200],na.rm=TRUE)
+  
+
+### Issue area analysis
+
+issues <- read.xlsx("Issue Descriptions.xlsx","Sheet1")
+issues <- merge(measure.stats,issues,by=c("cycle","measure"))
+
+xtabs( ~ extreme + broad, issues)
+xtabs( ~ position + broad, issues)
+chisq.test(issues$extreme,issues$broad)
+GKtau(issues$extreme, issues$broad)
+summary(factor(issues[issues$position=="Left",]$category))
+summary(factor(issues[issues$position=="Centre",]$category))
+summary(factor(issues[issues$position=="Right",]$category))
+
+
+
+
+
+
+
+
+##### Multiplot function ######
+#Credit: Cookbook-R.com: http://www.cookbook-r.com/Graphs/Multiple_graphs_on_one_page_(ggplot2)/
+
+# Multiple plot function
+#
+# ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
+# - cols:   Number of columns in layout
+# - layout: A matrix specifying the layout. If present, 'cols' is ignored.
+#
+# If the layout is something like matrix(c(1,2,3,3), nrow=2, byrow=TRUE),
+# then plot 1 will go in the upper left, 2 will go in the upper right, and
+# 3 will go all the way across the bottom.
+#
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  library(grid)
+  
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+  
+  numPlots = length(plots)
+  
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                     ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+  
+  if (numPlots==1) {
+    print(plots[[1]])
+    
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+    
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+      
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
